@@ -13,14 +13,14 @@ async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
         await db.commit()
-        try:
-            await db.execute("ALTER TABLE proxies ADD COLUMN locked_until TEXT")
-            await db.commit()
-        except Exception:
-            pass
-        await db.execute(
-            "CREATE INDEX IF NOT EXISTS idx_locked ON proxies(locked_until)"
-        )
+        for col, default in [("locked_until", "TEXT"), ("country", "TEXT NOT NULL DEFAULT ''")]:
+            try:
+                await db.execute(f"ALTER TABLE proxies ADD COLUMN {col} {default}")
+                await db.commit()
+            except Exception:
+                pass
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_locked ON proxies(locked_until)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_country ON proxies(country)")
         await db.commit()
 
 
@@ -168,3 +168,46 @@ async def unlock_expired() -> None:
             "UPDATE proxies SET locked_until = NULL WHERE locked_until < datetime('now')"
         )
         await db.commit()
+
+
+async def update_country(ip: str, port: int, country: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE proxies SET country = ? WHERE ip = ? AND port = ?",
+            (country, ip, port),
+        )
+        await db.commit()
+
+
+async def get_countries() -> List[Tuple[str, int]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            SELECT country, COUNT(*) as cnt FROM proxies
+            WHERE is_alive = 1 AND country != ''
+            GROUP BY country ORDER BY cnt DESC
+            """
+        )
+        return await cursor.fetchall()
+
+
+async def get_alive_by_country(country: str) -> List[Tuple[str, int]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT ip, port FROM proxies WHERE is_alive = 1 AND country = ? ORDER BY last_checked DESC",
+            (country,),
+        )
+        rows = await cursor.fetchall()
+        return [(row["ip"], row["port"]) for row in rows]
+
+
+async def get_proxies_without_country(limit: int = 500) -> List[Tuple[str, int]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT ip, port FROM proxies WHERE country = '' LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        return [(row["ip"], row["port"]) for row in rows]

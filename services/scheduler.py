@@ -9,10 +9,13 @@ from bot.config import SCRAPE_INTERVAL_MINUTES
 from db.database import (
     delete_duplicate_ips,
     delete_stale,
+    get_proxies_without_country,
     get_unchecked_proxies,
     mark_alive,
+    update_country,
     upsert_proxies,
 )
+from services.geoip import ensure_geoip_db, lookup_country
 from services.proxy_scraper import scrape_all
 from services.proxy_validator import validate_proxies
 
@@ -35,6 +38,14 @@ class JobStatus:
 
 
 job_status = JobStatus()
+
+PHASE_NAMES = {
+    "idle": "✅ Ожидание",
+    "scraping": "🔍 Сбор прокси",
+    "validating": "🧪 Проверка",
+    "geoip": "🌍 Определение стран",
+    "cleanup": "🧹 Очистка мёртвых",
+}
 
 
 async def scrape_and_validate_job() -> None:
@@ -83,7 +94,22 @@ async def scrape_and_validate_job() -> None:
                     return
                 await mark_alive(ip, port, alive)
 
-        # Phase 3: cleanup
+        # Phase 3: GeoIP enrichment
+        job_status.phase = "geoip"
+        await ensure_geoip_db()
+        no_country = await get_proxies_without_country(limit=2000)
+        geo_count = 0
+        for ip, port in no_country:
+            if job_status.cancel_requested:
+                break
+            country = lookup_country(ip)
+            if country:
+                await update_country(ip, port, country)
+                geo_count += 1
+        if geo_count:
+            logger.info("GeoIP enriched %d proxies", geo_count)
+
+        # Phase 4: cleanup
         job_status.phase = "cleanup"
         dupes = await delete_duplicate_ips()
         if dupes:

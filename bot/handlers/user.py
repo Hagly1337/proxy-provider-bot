@@ -1,12 +1,19 @@
+import io
 import logging
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot.config import ADMIN_ID
 from bot.keyboards.inline import back_menu, main_menu
-from db.database import get_alive_proxies, get_all_alive_proxies, get_stats
+from db.database import (
+    get_alive_by_country,
+    get_alive_proxies,
+    get_all_alive_proxies,
+    get_countries,
+    get_stats,
+)
 from services.proxy_scraper import SOCKS5_SOURCES
 
 router = Router()
@@ -137,4 +144,95 @@ async def cb_stats(callback: CallbackQuery) -> None:
         f"Источников: <b>{_SRC_COUNT}</b>"
     )
     await callback.message.edit_text(text, reply_markup=back_menu, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "download_txt")
+async def cb_download_txt(callback: CallbackQuery) -> None:
+    proxies = await get_all_alive_proxies()
+    if not proxies:
+        await callback.message.edit_text(
+            "😔 Пока нет проверенных прокси.",
+            reply_markup=back_menu,
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    content = "\n".join(f"{ip}:{port}" for ip, port in proxies)
+    file = BufferedInputFile(
+        content.encode("utf-8"),
+        filename=f"socks5_alive_{len(proxies)}.txt",
+    )
+    await callback.message.answer_document(
+        file,
+        caption=f"📄 <b>SOCKS5 прокси — {len(proxies)} шт</b>",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "countries")
+async def cb_countries(callback: CallbackQuery) -> None:
+    countries = await get_countries()
+    if not countries:
+        await callback.message.edit_text(
+            "🌍 Данные о странах пока не определены.\nПодождите завершения цикла проверки.",
+            reply_markup=back_menu,
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    buttons = []
+    for country_code, count in countries[:30]:
+        buttons.append([
+            InlineKeyboardButton(
+                text=f"{country_code} — {count} шт",
+                callback_data=f"country_{country_code}",
+            )
+        ])
+    buttons.append([
+        InlineKeyboardButton(text="⬅️ Назад в меню", callback_data="back_menu")
+    ])
+    kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    await callback.message.edit_text(
+        "🌍 <b>Выберите страну:</b>",
+        reply_markup=kb,
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("country_"))
+async def cb_country_proxies(callback: CallbackQuery) -> None:
+    country_code = callback.data.replace("country_", "")
+    proxies = await get_alive_by_country(country_code)
+
+    if not proxies:
+        await callback.message.edit_text(
+            f"😔 Нет живых прокси для <b>{country_code}</b>.",
+            reply_markup=back_menu,
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    if len(proxies) > 50:
+        content = "\n".join(f"{ip}:{port}" for ip, port in proxies)
+        file = BufferedInputFile(
+            content.encode("utf-8"),
+            filename=f"socks5_{country_code}_{len(proxies)}.txt",
+        )
+        await callback.message.answer_document(
+            file,
+            caption=f"🌍 <b>{country_code}</b> — {len(proxies)} прокси",
+            parse_mode="HTML",
+        )
+    else:
+        lines = [f"<code>{ip}:{port}</code>" for ip, port in proxies]
+        text = f"🌍 <b>{country_code} — {len(proxies)} шт:</b>\n\n" + "\n".join(lines)
+        await callback.message.edit_text(text, reply_markup=back_menu, parse_mode="HTML")
+
     await callback.answer()

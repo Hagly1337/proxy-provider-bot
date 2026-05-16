@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import re
+import shutil
 
 from aiogram import F, Router
 from aiogram.filters import Command
@@ -13,6 +14,7 @@ from bot.keyboards.inline import admin_menu, back_menu, main_menu
 from db.database import get_stats, upsert_proxies
 from services.proxy_validator import validate_proxies
 from services.scheduler import (
+    PHASE_NAMES,
     cancel_job,
     get_next_run,
     job_status,
@@ -33,22 +35,28 @@ def _is_admin(user_id: int) -> bool:
     return ADMIN_ID != 0 and user_id == ADMIN_ID
 
 
-PHASE_NAMES = {
-    "idle": "✅ Ожидание",
-    "scraping": "🔍 Сбор прокси",
-    "validating": "🧪 Проверка",
-    "cleanup": "🧹 Очистка мёртвых",
-}
+def _get_disk_usage() -> str:
+    try:
+        usage = shutil.disk_usage("/")
+        total_gb = usage.total / (1024 ** 3)
+        free_gb = usage.free / (1024 ** 3)
+        used_pct = (usage.used / usage.total) * 100
+        return f"{free_gb:.1f} GB свободно / {total_gb:.1f} GB ({used_pct:.0f}% занято)"
+    except Exception:
+        return "недоступно"
 
 
 async def _build_admin_text() -> str:
     stats = await get_stats()
     phase_text = PHASE_NAMES.get(job_status.phase, job_status.phase)
 
+    disk = _get_disk_usage()
+
     text = (
         "🛠 <b>Админ-панель</b>\n\n"
         f"📊 <b>БД:</b> {stats['total']} всего / {stats['alive']} живых\n"
         f"🔄 <b>Статус:</b> {phase_text}\n"
+        f"💾 <b>Диск:</b> {disk}\n"
     )
 
     if job_status.is_running:

@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS proxies (
     last_checked TEXT,
     is_alive    INTEGER NOT NULL DEFAULT 0,
     fail_count  INTEGER NOT NULL DEFAULT 0,
+    country     TEXT    NOT NULL DEFAULT '',
     UNIQUE(ip, port)
 );
 
