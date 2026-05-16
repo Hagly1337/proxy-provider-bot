@@ -10,31 +10,25 @@ Telegram-бот для автоматического сбора, валидац
 - Выдача прокси через удобное inline-меню
 - Любой пользователь может добавить свои прокси через ЛС
 
-## Деплой на VPS одной командой
+## Деплой на VPS — одна команда
 
-Требования: VPS с установленным **Docker** и **Docker Compose**.
-
-```bash
-git clone https://github.com/Hagly1337/proxy-provider-bot.git && cd proxy-provider-bot && cp .env.example .env && nano .env
-```
-
-В `nano` вставьте ваш токен и ID, сохраните (`Ctrl+O`, `Enter`, `Ctrl+X`), затем:
+Работает на чистом Ubuntu/Debian. Скрипт сам установит **Docker**, **Docker Compose**, **Git**, склонирует репо, спросит токен и запустит бота:
 
 ```bash
-docker-compose up -d --build
+curl -fsSL https://raw.githubusercontent.com/Hagly1337/proxy-provider-bot/main/setup.sh | bash
 ```
 
-**Готово!** Бот работает в фоне. Логи: `docker-compose logs -f`
+Или вручную:
+
+```bash
+git clone https://github.com/Hagly1337/proxy-provider-bot.git
+cd proxy-provider-bot
+bash setup.sh
+```
+
+Скрипт запросит `BOT_TOKEN` и `ADMIN_ID` интерактивно и создаст `.env` автоматически.
 
 > ⚠️ **Важно:** файл `.env` содержит ваш токен и **НЕ попадает в Git** (есть в `.gitignore`). В репозитории лежит только `.env.example` — шаблон без секретов.
-
-### Альтернатива: одна строка (если токен известен)
-
-```bash
-git clone https://github.com/Hagly1337/proxy-provider-bot.git && cd proxy-provider-bot && echo "BOT_TOKEN=123456:ABC-DEF" > .env && echo "ADMIN_ID=your_id" >> .env && docker-compose up -d --build
-```
-
-Замените `123456:ABC-DEF` на реальный токен и `your_id` на ваш Telegram ID.
 
 ---
 
