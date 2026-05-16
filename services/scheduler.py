@@ -66,19 +66,21 @@ async def scrape_and_validate_job() -> None:
 
         # Phase 2: validate
         job_status.phase = "validating"
-        to_check = await get_unchecked_proxies(limit=300)
+        to_check = await get_unchecked_proxies(limit=2000)
         job_status.total = len(to_check)
 
+        def _on_result(ip: str, port: int, alive: bool) -> None:
+            job_status.checked += 1
+            if alive:
+                job_status.alive_found += 1
+
         if to_check:
-            results = await validate_proxies(to_check)
+            results = await validate_proxies(to_check, on_result=_on_result)
             for (ip, port), alive in results:
                 if job_status.cancel_requested:
-                    logger.info("Job cancelled during validation")
+                    logger.info("Job cancelled during DB update")
                     return
                 await mark_alive(ip, port, alive)
-                job_status.checked += 1
-                if alive:
-                    job_status.alive_found += 1
 
         # Phase 3: cleanup
         job_status.phase = "cleanup"
