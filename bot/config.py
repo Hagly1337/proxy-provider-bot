@@ -7,7 +7,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / ".env")
 
 BOT_TOKEN: str = os.getenv("BOT_TOKEN", "")
-ADMIN_ID: int = int(os.getenv("ADMIN_ID", "0"))
+_raw_admin_id = os.getenv("ADMIN_ID", "0").strip()
+try:
+    ADMIN_ID: int = int(_raw_admin_id)
+except ValueError:
+    ADMIN_ID: int = 0
 
 DB_PATH: str = str(BASE_DIR / "data" / "proxies.db")
 
