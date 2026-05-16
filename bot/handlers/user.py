@@ -2,8 +2,9 @@ import logging
 
 from aiogram import F, Router
 from aiogram.filters import CommandStart, Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
+from bot.config import ADMIN_ID
 from bot.keyboards.inline import back_menu, main_menu
 from db.database import get_alive_proxies, get_all_alive_proxies, get_stats
 
@@ -18,9 +19,18 @@ WELCOME_TEXT = (
 )
 
 
+def _get_menu(user_id: int) -> InlineKeyboardMarkup:
+    buttons = list(main_menu.inline_keyboard)
+    if ADMIN_ID != 0 and user_id == ADMIN_ID:
+        buttons.append(
+            [InlineKeyboardButton(text="🛠 Админ-панель", callback_data="admin_panel")]
+        )
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer(WELCOME_TEXT, reply_markup=main_menu, parse_mode="HTML")
+    await message.answer(WELCOME_TEXT, reply_markup=_get_menu(message.from_user.id), parse_mode="HTML")
 
 
 @router.message(Command("help"))
@@ -34,13 +44,13 @@ async def cmd_help(message: Message) -> None:
         "➕ <b>Добавить</b> — отправьте прокси в формате ip:port\n"
         "📊 <b>Статистика</b> — текущее количество прокси в базе"
     )
-    await message.answer(text, reply_markup=main_menu, parse_mode="HTML")
+    await message.answer(text, reply_markup=_get_menu(message.from_user.id), parse_mode="HTML")
 
 
 @router.callback_query(F.data == "back_menu")
 async def cb_back_menu(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
-        WELCOME_TEXT, reply_markup=main_menu, parse_mode="HTML"
+        WELCOME_TEXT, reply_markup=_get_menu(callback.from_user.id), parse_mode="HTML"
     )
     await callback.answer()
 

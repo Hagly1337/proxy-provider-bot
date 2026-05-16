@@ -39,3 +39,32 @@ back_menu = InlineKeyboardMarkup(
         ]
     ]
 )
+
+admin_menu = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [
+            InlineKeyboardButton(
+                text="▶️ Запустить проверку",
+                callback_data="admin_start_job",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="⏹ Остановить проверку",
+                callback_data="admin_cancel_job",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="🔄 Обновить статус",
+                callback_data="admin_panel",
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                text="⬅️ Назад в меню",
+                callback_data="back_menu",
+            )
+        ],
+    ]
+)

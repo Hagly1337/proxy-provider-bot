@@ -1,14 +1,23 @@
+import asyncio
 import logging
 import re
 
 from aiogram import F, Router
+from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, Message
 
-from bot.keyboards.inline import back_menu, main_menu
-from db.database import upsert_proxies
+from bot.config import ADMIN_ID
+from bot.keyboards.inline import admin_menu, back_menu, main_menu
+from db.database import get_stats, upsert_proxies
 from services.proxy_validator import validate_proxies
+from services.scheduler import (
+    cancel_job,
+    get_next_run,
+    job_status,
+    scrape_and_validate_job,
+)
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -18,6 +27,96 @@ _IP_PORT_RE = re.compile(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):(\d{2,5})")
 
 class AddProxyState(StatesGroup):
     waiting_for_proxies = State()
+
+
+def _is_admin(user_id: int) -> bool:
+    return ADMIN_ID != 0 and user_id == ADMIN_ID
+
+
+PHASE_NAMES = {
+    "idle": "✅ Ожидание",
+    "scraping": "🔍 Сбор прокси",
+    "validating": "🧪 Проверка",
+    "cleanup": "🧹 Очистка мёртвых",
+}
+
+
+async def _build_admin_text() -> str:
+    stats = await get_stats()
+    phase_text = PHASE_NAMES.get(job_status.phase, job_status.phase)
+
+    text = (
+        "🛠 <b>Админ-панель</b>\n\n"
+        f"📊 <b>БД:</b> {stats['total']} всего / {stats['alive']} живых\n"
+        f"🔄 <b>Статус:</b> {phase_text}\n"
+    )
+
+    if job_status.is_running:
+        if job_status.phase == "scraping":
+            text += f"🔍 <b>Собрано:</b> {job_status.scraped} прокси\n"
+        elif job_status.phase == "validating":
+            text += (
+                f"🧪 <b>Проверено:</b> {job_status.checked}/{job_status.total}\n"
+                f"✅ <b>Живых найдено:</b> {job_status.alive_found}\n"
+            )
+        if job_status.cancel_requested:
+            text += "⚠️ <b>Отмена запрошена…</b>\n"
+    else:
+        text += (
+            f"📅 <b>Посл. запуск:</b> {job_status.last_run}\n"
+            f"⏱ <b>Длительность:</b> {job_status.last_duration or '—'}\n"
+            f"⏭ <b>След. запуск:</b> {get_next_run()}\n"
+        )
+
+    return text
+
+
+@router.message(Command("admin"))
+async def cmd_admin(message: Message) -> None:
+    if not _is_admin(message.from_user.id):
+        await message.answer("⛔ Доступ запрещён.")
+        return
+    text = await _build_admin_text()
+    await message.answer(text, reply_markup=admin_menu, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_panel")
+async def cb_admin_panel(callback: CallbackQuery) -> None:
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён.", show_alert=True)
+        return
+    text = await _build_admin_text()
+    await callback.message.edit_text(text, reply_markup=admin_menu, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "admin_start_job")
+async def cb_admin_start(callback: CallbackQuery) -> None:
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён.", show_alert=True)
+        return
+    if job_status.is_running:
+        await callback.answer("⚠️ Проверка уже идёт!", show_alert=True)
+        return
+    asyncio.create_task(scrape_and_validate_job())
+    await callback.answer("▶️ Проверка запущена!", show_alert=True)
+    # Refresh panel after short delay
+    await asyncio.sleep(1)
+    text = await _build_admin_text()
+    await callback.message.edit_text(text, reply_markup=admin_menu, parse_mode="HTML")
+
+
+@router.callback_query(F.data == "admin_cancel_job")
+async def cb_admin_cancel(callback: CallbackQuery) -> None:
+    if not _is_admin(callback.from_user.id):
+        await callback.answer("⛔ Доступ запрещён.", show_alert=True)
+        return
+    if cancel_job():
+        await callback.answer("⏹ Отмена запрошена…", show_alert=True)
+    else:
+        await callback.answer("ℹ️ Проверка не запущена.", show_alert=True)
+    text = await _build_admin_text()
+    await callback.message.edit_text(text, reply_markup=admin_menu, parse_mode="HTML")
 
 
 @router.callback_query(F.data == "add_proxy")
