@@ -7,14 +7,17 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 from bot.config import ADMIN_ID
 from bot.keyboards.inline import back_menu, main_menu
 from db.database import get_alive_proxies, get_all_alive_proxies, get_stats
+from services.proxy_scraper import SOCKS5_SOURCES
 
 router = Router()
 logger = logging.getLogger(__name__)
 
+_SRC_COUNT = len(SOCKS5_SOURCES)
+
 WELCOME_TEXT = (
     "👋 <b>Proxy Provider Bot</b>\n\n"
-    "Бот автоматически собирает и проверяет бесплатные <b>SOCKS5</b> прокси "
-    "из 25 открытых источников.\n\n"
+    f"Бот автоматически собирает и проверяет бесплатные <b>SOCKS5</b> прокси "
+    f"из {_SRC_COUNT} открытых источников.\n\n"
     "Выберите действие:"
 )
 
@@ -131,7 +134,7 @@ async def cb_stats(callback: CallbackQuery) -> None:
         f"📊 <b>Статистика</b>\n\n"
         f"Всего прокси в базе: <b>{stats['total']}</b>\n"
         f"Из них живых: <b>{stats['alive']}</b>\n"
-        f"Источников: <b>25</b>"
+        f"Источников: <b>{_SRC_COUNT}</b>"
     )
     await callback.message.edit_text(text, reply_markup=back_menu, parse_mode="HTML")
     await callback.answer()
