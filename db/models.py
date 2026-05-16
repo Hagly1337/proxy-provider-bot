@@ -9,11 +9,9 @@ CREATE TABLE IF NOT EXISTS proxies (
     last_checked TEXT,
     is_alive    INTEGER NOT NULL DEFAULT 0,
     fail_count  INTEGER NOT NULL DEFAULT 0,
-    locked_until TEXT,
     UNIQUE(ip, port)
 );
 
 CREATE INDEX IF NOT EXISTS idx_alive ON proxies(is_alive);
 CREATE INDEX IF NOT EXISTS idx_protocol ON proxies(protocol);
-CREATE INDEX IF NOT EXISTS idx_locked ON proxies(locked_until);
 """

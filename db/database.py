@@ -12,10 +12,15 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
+        await db.commit()
         try:
             await db.execute("ALTER TABLE proxies ADD COLUMN locked_until TEXT")
+            await db.commit()
         except Exception:
             pass
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_locked ON proxies(locked_until)"
+        )
         await db.commit()
 
 
