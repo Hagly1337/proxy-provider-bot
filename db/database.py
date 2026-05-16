@@ -12,6 +12,10 @@ async def init_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     async with aiosqlite.connect(DB_PATH) as db:
         await db.executescript(SCHEMA)
+        try:
+            await db.execute("ALTER TABLE proxies ADD COLUMN locked_until TEXT")
+        except Exception:
+            pass
         await db.commit()
 
 
@@ -109,16 +113,53 @@ async def delete_stale() -> int:
         return cursor.rowcount
 
 
+async def delete_duplicate_ips() -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            DELETE FROM proxies
+            WHERE id NOT IN (
+                SELECT MIN(id) FROM proxies
+                GROUP BY ip
+            )
+            """
+        )
+        await db.commit()
+        return cursor.rowcount
+
+
 async def get_unchecked_proxies(limit: int = 200) -> List[Tuple[str, int]]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """
             SELECT ip, port FROM proxies
+            WHERE locked_until IS NULL OR locked_until < datetime('now')
             ORDER BY last_checked ASC NULLS FIRST
             LIMIT ?
             """,
             (limit,),
         )
         rows = await cursor.fetchall()
-        return [(row["ip"], row["port"]) for row in rows]
+        proxies = [(row["ip"], row["port"]) for row in rows]
+        if proxies:
+            placeholders = ",".join(
+                f"('{ip}',{port})" for ip, port in proxies
+            )
+            await db.execute(
+                f"""
+                UPDATE proxies
+                SET locked_until = datetime('now', '+5 minutes')
+                WHERE (ip, port) IN (VALUES {placeholders})
+                """
+            )
+            await db.commit()
+        return proxies
+
+
+async def unlock_expired() -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "UPDATE proxies SET locked_until = NULL WHERE locked_until < datetime('now')"
+        )
+        await db.commit()

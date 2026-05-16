@@ -7,6 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.config import SCRAPE_INTERVAL_MINUTES
 from db.database import (
+    delete_duplicate_ips,
     delete_stale,
     get_unchecked_proxies,
     mark_alive,
@@ -84,6 +85,9 @@ async def scrape_and_validate_job() -> None:
 
         # Phase 3: cleanup
         job_status.phase = "cleanup"
+        dupes = await delete_duplicate_ips()
+        if dupes:
+            logger.info("Deleted %d duplicate IP entries", dupes)
         deleted = await delete_stale()
         if deleted:
             logger.info("Deleted %d stale proxies", deleted)
