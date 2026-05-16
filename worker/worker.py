@@ -24,8 +24,8 @@ logger = logging.getLogger("worker")
 
 CHECK_URL = "http://httpbin.org/ip"
 VALIDATE_TIMEOUT = 10
-CONCURRENCY = 100
-BATCH_SIZE = 500
+CONCURRENCY = 150
+BATCH_SIZE = 1000
 SLEEP_BETWEEN_BATCHES = 5
 
 

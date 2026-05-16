@@ -9,4 +9,4 @@ services:
       - "--master=http://MASTER_IP:8080"
       - "--secret=change-me-secret"
       - "--concurrency=100"
-      - "--batch-size=500"
+      - "--batch-size=1000"

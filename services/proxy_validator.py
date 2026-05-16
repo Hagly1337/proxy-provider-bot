@@ -10,7 +10,7 @@ from bot.config import VALIDATE_TIMEOUT
 logger = logging.getLogger(__name__)
 
 CHECK_URL = "http://httpbin.org/ip"
-CONCURRENCY = 100
+CONCURRENCY = 200
 
 
 async def _check_one(

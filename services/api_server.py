@@ -7,7 +7,7 @@ from db.database import get_unchecked_proxies, mark_alive
 
 logger = logging.getLogger(__name__)
 
-BATCH_SIZE = 500
+BATCH_SIZE = 1000
 
 
 def _check_auth(request: web.Request) -> bool:
@@ -21,7 +21,7 @@ async def handle_get_batch(request: web.Request) -> web.Response:
 
     try:
         limit = int(request.query.get("limit", str(BATCH_SIZE)))
-        limit = min(limit, 2000)
+        limit = min(limit, 3000)
     except ValueError:
         limit = BATCH_SIZE
 

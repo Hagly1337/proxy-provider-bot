@@ -66,7 +66,7 @@ async def scrape_and_validate_job() -> None:
 
         # Phase 2: validate
         job_status.phase = "validating"
-        to_check = await get_unchecked_proxies(limit=2000)
+        to_check = await get_unchecked_proxies(limit=7000)
         job_status.total = len(to_check)
 
         def _on_result(ip: str, port: int, alive: bool) -> None:
