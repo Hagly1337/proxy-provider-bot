@@ -19,3 +19,6 @@ SCRAPE_INTERVAL_MINUTES: int = 15
 VALIDATE_TIMEOUT: int = 10
 PROXY_BATCH_SIZE: int = 10
 MAX_FAIL_COUNT: int = 3
+
+API_PORT: int = int(os.getenv("API_PORT", "8080"))
+API_SECRET: str = os.getenv("API_SECRET", "change-me-secret")

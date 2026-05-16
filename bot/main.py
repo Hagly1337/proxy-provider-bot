@@ -6,9 +6,10 @@ from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
 
-from bot.config import BOT_TOKEN
+from bot.config import API_PORT, BOT_TOKEN
 from bot.handlers import admin, user
 from db.database import init_db
+from services.api_server import start_api_server
 from services.scheduler import scrape_and_validate_job, start_scheduler
 
 logging.basicConfig(
@@ -22,6 +23,9 @@ logger = logging.getLogger(__name__)
 async def on_startup(bot: Bot) -> None:
     logger.info("Initializing database…")
     await init_db()
+
+    logger.info("Starting API server for workers on port %d…", API_PORT)
+    await start_api_server()
 
     logger.info("Starting scheduler…")
     start_scheduler()

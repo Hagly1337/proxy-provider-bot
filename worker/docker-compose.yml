@@ -1,0 +1,12 @@
+version: "3.8"
+
+services:
+  worker:
+    build: .
+    container_name: proxy-worker
+    restart: unless-stopped
+    command:
+      - "--master=http://MASTER_IP:8080"
+      - "--secret=change-me-secret"
+      - "--concurrency=100"
+      - "--batch-size=500"
