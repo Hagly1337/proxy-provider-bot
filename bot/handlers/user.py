@@ -11,6 +11,7 @@ from db.database import (
     get_alive_by_country,
     get_alive_proxies,
     get_all_alive_proxies,
+    get_all_proxies,
     get_countries,
     get_stats,
 )
@@ -167,6 +168,31 @@ async def cb_download_txt(callback: CallbackQuery) -> None:
     await callback.message.answer_document(
         file,
         caption=f"📄 <b>SOCKS5 прокси — {len(proxies)} шт</b>",
+        parse_mode="HTML",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data == "download_all_txt")
+async def cb_download_all_txt(callback: CallbackQuery) -> None:
+    proxies = await get_all_proxies()
+    if not proxies:
+        await callback.message.edit_text(
+            "😔 База пуста.",
+            reply_markup=back_menu,
+            parse_mode="HTML",
+        )
+        await callback.answer()
+        return
+
+    content = "\n".join(f"{ip}:{port}" for ip, port in proxies)
+    file = BufferedInputFile(
+        content.encode("utf-8"),
+        filename=f"socks5_all_{len(proxies)}.txt",
+    )
+    await callback.message.answer_document(
+        file,
+        caption=f"📦 <b>Все прокси из БД — {len(proxies)} шт</b>",
         parse_mode="HTML",
     )
     await callback.answer()

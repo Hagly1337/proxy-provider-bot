@@ -112,6 +112,16 @@ async def get_all_alive_proxies() -> List[Tuple[str, int]]:
         return [(row["ip"], row["port"]) for row in rows]
 
 
+async def get_all_proxies() -> List[Tuple[str, int]]:
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT ip, port FROM proxies ORDER BY last_checked DESC NULLS LAST"
+        )
+        rows = await cursor.fetchall()
+        return [(row["ip"], row["port"]) for row in rows]
+
+
 async def get_stats() -> dict:
     async with aiosqlite.connect(DB_PATH) as db:
         cursor = await db.execute("SELECT COUNT(*) FROM proxies")

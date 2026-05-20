@@ -16,9 +16,15 @@ main_menu = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(
-                text="📄 Скачать .txt",
+                text="📄 Живые .txt",
                 callback_data="download_txt",
             ),
+            InlineKeyboardButton(
+                text="📦 Все .txt",
+                callback_data="download_all_txt",
+            ),
+        ],
+        [
             InlineKeyboardButton(
                 text="🌍 По странам",
                 callback_data="countries",
