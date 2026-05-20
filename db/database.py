@@ -56,7 +56,8 @@ async def mark_alive(ip: str, port: int, alive: bool) -> None:
             await db.execute(
                 """
                 UPDATE proxies
-                SET is_alive = 1, fail_count = 0, last_checked = datetime('now')
+                SET is_alive = 1, fail_count = 0,
+                    last_checked = datetime('now'), locked_until = NULL
                 WHERE ip = ? AND port = ?
                 """,
                 (ip, port),
@@ -66,12 +67,23 @@ async def mark_alive(ip: str, port: int, alive: bool) -> None:
                 """
                 UPDATE proxies
                 SET is_alive = 0, fail_count = fail_count + 1,
-                    last_checked = datetime('now')
+                    last_checked = datetime('now'), locked_until = NULL
                 WHERE ip = ? AND port = ?
                 """,
                 (ip, port),
             )
         await db.commit()
+
+
+async def get_total_unchecked() -> int:
+    async with aiosqlite.connect(DB_PATH) as db:
+        cursor = await db.execute(
+            """
+            SELECT COUNT(*) FROM proxies
+            WHERE locked_until IS NULL OR locked_until < datetime('now')
+            """
+        )
+        return (await cursor.fetchone())[0]
 
 
 async def get_alive_proxies(limit: int = 10) -> List[Tuple[str, int]]:

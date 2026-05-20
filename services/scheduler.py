@@ -10,6 +10,7 @@ from db.database import (
     delete_duplicate_ips,
     delete_stale,
     get_proxies_without_country,
+    get_total_unchecked,
     get_unchecked_proxies,
     mark_alive,
     update_country,
@@ -76,17 +77,31 @@ async def scrape_and_validate_job() -> None:
             logger.info("Job cancelled after scraping")
             return
 
-        # Phase 2: validate
+        # Phase 2: validate ALL proxies in batches
         job_status.phase = "validating"
-        to_check = await get_unchecked_proxies(limit=7000)
-        job_status.total = len(to_check)
+        MASTER_BATCH = 5000
+        total_in_db = await get_total_unchecked()
+        job_status.total = total_in_db
 
         def _on_result(ip: str, port: int, alive: bool) -> None:
             job_status.checked += 1
             if alive:
                 job_status.alive_found += 1
 
-        if to_check:
+        batch_num = 0
+        while True:
+            if job_status.cancel_requested:
+                logger.info("Job cancelled during validation")
+                return
+
+            to_check = await get_unchecked_proxies(limit=MASTER_BATCH)
+            if not to_check:
+                logger.info("No more proxies to check, master done")
+                break
+
+            batch_num += 1
+            logger.info("Master batch #%d: %d proxies", batch_num, len(to_check))
+
             results = await validate_proxies(to_check, on_result=_on_result)
             for (ip, port), alive in results:
                 if job_status.cancel_requested:
@@ -94,10 +109,12 @@ async def scrape_and_validate_job() -> None:
                     return
                 await mark_alive(ip, port, alive)
 
+        logger.info("Master validated %d proxies total", job_status.checked)
+
         # Phase 3: GeoIP enrichment
         job_status.phase = "geoip"
         await ensure_geoip_db()
-        no_country = await get_proxies_without_country(limit=2000)
+        no_country = await get_proxies_without_country(limit=50000)
         geo_count = 0
         for ip, port in no_country:
             if job_status.cancel_requested:
